@@ -47,6 +47,41 @@ function fmtEurK(n) { return n >= 1e6 ? '€'+fmt(n/1e6,1)+'M' : '€'+fmt(Math.
 // =========================================================
 // OUTPUT CARDS (top of page)
 // =========================================================
+
+/**
+ * If equity ratio is below the bank minimum, show how much
+ * Direktkredite would be needed to close the gap, both total
+ * and per household. Includes a button to auto-set it.
+ */
+function renderDirektkreditHint(R, equityOk) {
+  // Required equity = totalProjectCost × minEquityPct
+  // Current equity  = memberEquity + direktkredite
+  // Shortfall       = required - current (if positive)
+  const requiredEquity = R.totalProjectCost * pct(state.bankMinEquityPct);
+  const currentEquity  = R.memberEquity + R.direktkreditTotal;
+  const shortfall      = requiredEquity - currentEquity;
+
+  if (shortfall <= 0) {
+    // Already meeting the requirement — show how much Direktkredite contributes
+    if (R.direktkreditTotal > 0) {
+      return `<div class="sub" style="margin-top:0.2rem">${tip('Direktkredite')}: ${fmtEur(R.direktkreditTotal)} (${fmtEur(Math.round(R.direktkreditTotal / R.totalHH))}/household)</div>`;
+    }
+    return '';
+  }
+
+  // Need this much total Direktkredite to hit the minimum
+  const needed = Math.ceil(shortfall / 1000) * 1000; // round up to nearest €1k
+  const neededTotal = R.direktkreditTotal + needed;
+  const perHH = R.totalHH > 0 ? Math.round(neededTotal / R.totalHH) : 0;
+
+  return `<div class="dk-hint">
+    Need <strong>${fmtEur(needed)}</strong> more ${tip('Direktkredite')}
+    (${fmtEur(neededTotal)} total · ~${fmtEur(perHH)} per household)
+    <button class="dk-set-btn" onclick="state.direktkreditEnabled=true;state.direktkreditVolume=${neededTotal};fullUpdate()"
+      title="Set Direktkredite to ${fmtEur(neededTotal)}">Set to ${fmtEur(neededTotal)}</button>
+  </div>`;
+}
+
 function renderOutputCards(R) {
   const equityOk = R.equityRatio >= state.bankMinEquityPct;
   document.getElementById('outCards').innerHTML = `
@@ -64,6 +99,7 @@ function renderOutputCards(R) {
       <div class="label">Equity Ratio ${infoIcon('(Member equity + Direktkredite) ÷ total project cost. Increase by raising coop shares, adding Direktkredite, or reducing project scope.')}</div>
       <div class="value ${equityOk ? '' : 'warn'}">${fmt(R.equityRatio,1)}%</div>
       <div class="sub">${equityOk ? '✓ Meets' : '⚠ Below'} ${state.bankMinEquityPct}% bank minimum</div>
+      ${renderDirektkreditHint(R, equityOk)}
     </div>
     <div class="out-card">
       <div class="label">Avg. Rent ${infoIcon('Total annual cooperative cost ÷ total usable area ÷ 12. Average across all unit types — individual types may vary.')}</div>
