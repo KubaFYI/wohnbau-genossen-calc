@@ -203,13 +203,13 @@ function renderUnitResults(R) {
 // =========================================================
 function renderFinancingStack(R) {
   const items = [
-    { label: 'Member Equity', val: R.memberEquity, color: '#4fc3f7',
+    { label: 'Member Equity', val: R.memberEquity, color: '#1565c0',
       desc: "Coop shares from all members (funded via cash and/or personal KfW 134 loans — from the cooperative's perspective this is simply equity received)" },
-    { label: 'KfW 298',      val: R.kfw298Total,  color: '#ffa726',
+    { label: 'KfW 298',      val: R.kfw298Total,  color: '#ef6c00',
       desc: 'Subsidized construction loan to the cooperative from KfW' },
-    { label: 'Direktkredite', val: R.direktkreditTotal, color: '#ab47bc',
+    { label: 'Direktkredite', val: R.direktkreditTotal, color: '#7b1fa2',
       desc: 'Subordinated loans from supporters at below-market rates' },
-    { label: 'Bank Loan',    val: R.bankLoan, color: '#ef5350',
+    { label: 'Bank Loan',    val: R.bankLoan, color: '#c62828',
       desc: 'Remaining amount financed through a commercial bank' },
   ].filter(i => i.val > 0);
 
