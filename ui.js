@@ -84,11 +84,21 @@ function renderUnitResults(R) {
   const rows = R.units.filter(u => u.result).map(u => {
     const r = u.result;
 
-    // One-off entry columns
-    const shareCell = fmtEur(r.coopShare);
-    const cashCell  = fmtEur(r.upfrontCash);
+    // One-off entry: coop share with KfW 134 coverage note underneath
+    let coverageNote;
+    if (r.kfw134) {
+      const covered = r.kfw134.loanAmount;
+      if (covered >= r.coopShare) {
+        coverageNote = `<span style="font-size:0.68rem;color:var(--text-muted)">(all covered by ${tip('KfW 134')} loan)</span>`;
+      } else {
+        coverageNote = `<span style="font-size:0.68rem;color:var(--text-muted)">(of which ${fmtEur(covered)} covered by ${tip('KfW 134')} loan)</span>`;
+      }
+    } else {
+      coverageNote = `<span style="font-size:0.68rem;color:var(--text-muted)">(full cash — ${tip('KfW 134')} not eligible)</span>`;
+    }
+    const shareCell = `${fmtEur(r.coopShare)}<br>${coverageNote}`;
 
-    // Monthly columns
+    // Monthly rent
     const rentCell = fmtEur(r.monthlyRent);
 
     let kfwCell;
@@ -112,7 +122,6 @@ function renderUnitResults(R) {
       <td>${u.unitCount} ${tip('housing unit','units')} · ${u.actualHH} ${tip('household','hh')}</td>
       <td>${fmt(r.m2PerHH)} m²</td>
       <td style="border-left:1px solid var(--border-light)">${shareCell}</td>
-      <td>${cashCell}</td>
       <td style="border-left:1px solid var(--border-light)" class="highlight">${rentCell}</td>
       <td>${kfwCell}</td>
       ${m2Cell}
@@ -126,14 +135,13 @@ function renderUnitResults(R) {
     <table>
       <tr>
         <th>Type</th><th>Count</th><th>m²/${tip('household','hh')}</th>
-        <th colspan="2" style="text-align:center;border-left:1px solid var(--border-light)">── One-off Entry ──</th>
+        <th style="text-align:center;border-left:1px solid var(--border-light)">One-off Entry</th>
         <th colspan="2" style="text-align:center;border-left:1px solid var(--border-light)">── Monthly ──</th>
         ${m2Header}
       </tr>
       <tr>
         <th></th><th></th><th></th>
         <th style="border-left:1px solid var(--border-light)">Coop Share ${infoIcon('Total cooperative share (unit-specific Pflichtanteile + common share per adult). This is the one-off entry cost to join.')}</th>
-        <th>Upfront Cash ${infoIcon('Cash you actually need at entry. For single-unit members this is coop share minus the KfW 134 loan amount. For WG members it equals the full coop share.')}</th>
         <th style="border-left:1px solid var(--border-light)">Rent ${infoIcon("Your share of the cooperative's running costs: bank loan, KfW 298, operating costs, etc. Proportional to the floor area your unit type uses.")}</th>
         <th>${tip('KfW 134')} Repayment ${infoIcon("Personal loan repayment — not part of the cooperative's finances. Shown for information so single-unit members can estimate their total monthly outgoings.")}</th>
         ${m2Header}
