@@ -347,6 +347,8 @@ function calc() {
     const adultsInHH = s.adultsPerHH;
     const coopShare  = u.sharePrice + (adultsInHH * s.commonSharePerAdult);
     const m2PerHH    = u.m2 / u.hhPerUnit;
+    // For rent-per-m², include each household's proportional share of common space
+    const m2PerHHWithCommon = m2PerHH + (R.sharedNUF / R.totalHH);
 
     // --- KfW 134 (personal loan, only for single-unit types) ---
     let kfw134 = null;
@@ -391,8 +393,8 @@ function calc() {
       upfrontCash,
       m2PerHH,
       kfw134,
-      // Rent per m² (only based on rent, not KfW 134 personal repayment)
-      rentPerM2: m2PerHH > 0 ? monthlyRent / m2PerHH : 0,
+      // Rent per m² (including household's share of common space, excluding KfW 134)
+      rentPerM2: m2PerHHWithCommon > 0 ? monthlyRent / m2PerHHWithCommon : 0,
     };
   });
 
