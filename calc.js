@@ -32,7 +32,7 @@ const state = {
   commonSharePerAdult: 1000,   // flat cooperative share every adult pays
 
   // --- Construction cost assumptions ---
-  baseCostPerM2BGF:  2800,   // €/m² BGF (KG 300+400)
+  baseCostPerM2BGF:  2900,   // €/m² BGF (KG 300+400)
   bgfToNufRatio:     1.30,   // gross-to-net floor area multiplier
   sharedKitchenCost: 25000,  // € per shared kitchen
   energyPremiumPct:  7,      // % surcharge for energy standard
@@ -49,7 +49,7 @@ const state = {
   hoaiPct:           15,     // architecture & planning as % of construction
   permitsCost:       30000,  // permits, surveys, Gutachten (flat €)
   legalCost:         25000,  // cooperative legal setup (flat €)
-  energieberaterCost: 15000, // energy consultant / QNG certification (flat €)
+  energieberaterCost: 25000, // energy consultant / QNG certification (flat €)
 
   // --- Bank loan ---
   bankRate:          3.5,    // annual interest %
@@ -58,13 +58,13 @@ const state = {
   bankInterestOnly:  false,  // if true, no principal repayment
 
   // --- KfW 134 (personal member loan — not coop-level) ---
-  kfw134Term:        20,     // loan duration in years
+  kfw134Term:        25,     // loan duration in years (4–25 or 26–35)
   kfw134Commitment:  10,     // interest rate lock-in: 5 or 10 years
-  kfw134Grace:       4,      // repayment-free start-up years
+  kfw134Grace:       3,      // repayment-free years (1–3 for 4–25yr; 1–5 for 26–35yr)
 
   // --- KfW 298 (construction loan to cooperative) ---
-  kfw298Rate:        0.60,   // annual interest %
-  kfw298MaxPerUnit:  100000, // € per housing unit (auto-set by energy standard)
+  kfw298Rate:        0.60,   // annual interest % (EH40/QNG as of 02.03.2026; EH55 ~1.0%)
+  kfw298MaxPerUnit:  100000, // € per WE (100k for EH40/EH55, 150k with QNG)
   kfw298Term:        30,     // years
   kfw298Grace:       3,      // years
 
@@ -121,6 +121,9 @@ const KFW134_REPAYMENT_GRANT = 0.15;  // 15% Tilgungszuschuss
 // =========================================================
 // KfW 134 interest rate — determined by loan term and
 // interest-rate commitment period per KfW's rate table.
+//
+// Rates as of launch 03.02.2026 (subject to periodic KfW
+// adjustments — verify at kfw.de/konditionen):
 //
 // Duration       Commitment   Rate
 // 4–25 years     5 years      0.01%
@@ -272,10 +275,12 @@ function calc() {
   R.memberEquity   = R.unitTypeShares + R.commonShares;
 
   // KfW 298: subsidized construction loan per housing unit
+  // Max per unit depends on energy standard: €150k with QNG, €100k otherwise
+  const kfw298Cap = s.energyStandard === 'EH40-QNG' ? 150000 : 100000;
   R.kfw298Total = 0;
   if (s.kfw298Enabled && R.totalUnits > 0) {
     const costPerUnit = R.totalConstruction / R.totalUnits;
-    R.kfw298Total = R.totalUnits * Math.min(s.kfw298MaxPerUnit, costPerUnit);
+    R.kfw298Total = R.totalUnits * Math.min(kfw298Cap, costPerUnit);
   }
 
   R.direktkreditTotal = s.direktkreditEnabled ? s.direktkreditVolume : 0;

@@ -14,7 +14,7 @@ const GLOSSARY = {
   'GFZ':              'Geschossflächenzahl — plot ratio. Zoning parameter that limits how much floor area you can build relative to the plot size.',
   'Bodenrichtwert':   'Official reference land value per m², published by the Berlin Gutachterausschuss. Check boris-berlin.de for specific addresses.',
   'HOAI':             'Honorarordnung für Architekten — German architects\' fee schedule. Since 2021 fees are negotiable, but HOAI rates still serve as standard orientation.',
-  'QNG':              'Qualitätssiegel Nachhaltiges Gebäude — sustainability certification required for the higher KfW 298 tier (€150k/unit). Adds €15–25k in costs.',
+  'QNG':              'Qualitätssiegel Nachhaltiges Gebäude — sustainability certification required for the higher KfW 298 tier (€150k/unit). Adds €20–40k in consulting and certification costs.',
   'EH40':             'Effizienzhaus 40 — building uses only 40% of the energy of a reference building. Required for KfW 298 funding.',
   'Grunderwerbsteuer':'Property transfer tax — 6% in Berlin. Only applies when buying land (Kauf), not for Erbbaurecht.',
   'household':        'One membership slot in the cooperative. In WGs, each private room = one household.',
@@ -382,30 +382,30 @@ function getSections() {
           ${toggle('konzeptverfahren',tip('Konzeptverfahren')+' (Berlin city land)','Land via BIM Berlin concept competition')}
           ${s.konzeptverfahren ? slider('erbbauzinsDiscount',tip('Erbbauzins')+' discount', 0,50,5,'Discount vs. standard 1.8% rate') : ''}` : ''}
         <div class="sub-heading">Land Values</div>
-        ${slider('bodenrichtwert',tip('Bodenrichtwert'), 150,2000,10,'Check boris-berlin.de · outer ~€250, inner €1,000+')}
+        ${slider('bodenrichtwert',tip('Bodenrichtwert'), 100,2500,10,'Check boris-berlin.de · outer ~€250, inner €1,000+')}
         ${slider('gfz',tip('GFZ','GFZ (plot ratio)'), 0.6,3,0.1,'Set by Bebauungsplan · typical 0.8–2.5')}
         ${s.landModel==='Kauf' ? `
           ${slider('transferTaxPct',tip('Grunderwerbsteuer'), 6,6,0.5,'Berlin: fixed at 6%')}
           ${slider('notaryPct','Notary & registration', 1.5,2.5,0.1)}` : `
-          ${slider('erbbauzinsRatePct',tip('Erbbauzins')+' rate', 1,3,0.1,'Standard Berlin: 1.8% of land value')}`}`
+          ${slider('erbbauzinsRatePct',tip('Erbbauzins')+' rate', 0.5,4,0.1,'Standard Berlin: 1.8% of land value')}`}`
     },
     { title: 'Financing Choices', tag: 'WISHES', open: false, body: () => `
-        ${toggle('kfw298Enabled','Enable '+tip('KfW 298')+' (construction loan)','Subsidized coop loan — up to €100k/unit (€150k with '+tip('QNG')+')')}
+        ${toggle('kfw298Enabled','Enable '+tip('KfW 298')+' (construction loan)','Subsidized coop loan — €100k/unit (€150k with '+tip('QNG')+')')}
         ${toggle('direktkreditEnabled','Enable '+tip('Direktkredite'),'Subordinated loans from supporters at below-market rates')}
         ${s.direktkreditEnabled ? slider('direktkreditVolume','Target '+tip('Direktkredite')+' volume', 0,1000000,10000) : ''}`
     },
     { title: 'Construction Costs', tag: 'ASSUMPTIONS', open: false, body: () => `
-        ${slider('baseCostPerM2BGF','Base cost (KG 300+400)', 2200,3800,50,'Berlin 2027 MFH: roughly €2,500–€3,500/m² '+tip('BGF'))}
-        ${slider('bgfToNufRatio',tip('BGF')+'-to-'+tip('NUF')+' ratio', 1.15,1.45,0.01,'Walls, stairs, hallways, elevators')}
+        ${slider('baseCostPerM2BGF','Base cost (KG 300+400)', 2000,4200,50,'Berlin 2027 MFH: roughly €2,500–€3,500/m² '+tip('BGF'))}
+        ${slider('bgfToNufRatio',tip('BGF')+'-to-'+tip('NUF')+' ratio', 1.15,1.50,0.01,'Walls, stairs, hallways, elevators')}
         ${slider('sharedKitchenCost','Shared kitchen cost (each)', 10000,80000,1000,'Commercial-grade = much higher')}
         ${slider('energyPremiumPct','Energy standard premium', 0,20,1,tip('EH40')+' ~5–8%, '+tip('QNG','EH40+QNG')+' ~10–15% over EH55')}
         ${slider('contingencyPct','Construction contingency', 5,20,1,'10% = optimistic, 15% = realistic')}`
     },
     { title: 'Soft Costs', tag: 'ASSUMPTIONS', open: false, body: () => `
-        ${slider('hoaiPct','Architecture & planning ('+tip('HOAI')+')', 12,20,0.5,'Full-service, all Leistungsphasen')}
+        ${slider('hoaiPct','Architecture & planning ('+tip('HOAI')+')', 10,22,0.5,'Full-service, all Leistungsphasen')}
         ${slider('permitsCost','Permits, surveys, Gutachten', 15000,60000,1000)}
         ${slider('legalCost','Legal & cooperative setup', 15000,45000,1000)}
-        ${slider('energieberaterCost','Energieberater / '+tip('QNG')+' certification', 8000,45000,1000)}`
+        ${slider('energieberaterCost','Energieberater / '+tip('QNG')+' certification', 5000,50000,1000)}`
     },
     { title: 'Financing Terms', tag: 'ASSUMPTIONS', open: false, body: () => `
         <div class="sub-heading">Bank Loan</div>
@@ -422,11 +422,14 @@ function getSections() {
         </p>
         ${slider('kfw134Term','Loan term', 4,35,1)}
         ${enumButtons('kfw134Commitment','Rate commitment period',[5,10],'Longer = higher rate',true)}
-        ${slider('kfw134Grace','Grace period (repayment-free)', 1,5,1,'Interest-only — monthly payment jumps when this ends')}
+        ${slider('kfw134Grace','Grace period (repayment-free)', 1, s.kfw134Term >= 26 ? 5 : 3, 1,'Interest-only — monthly payment jumps when this ends')}
 
         <div class="sub-heading">${tip('KfW 298')} (Construction Loan)</div>
-        ${slider('kfw298Rate','Interest rate', 0.1,2,0.05,'~0.6% for EH40+QNG, ~1.0% for EH55')}
-        ${slider('kfw298MaxPerUnit','Max loan per '+tip('housing unit','unit'), 100000,150000,10000,'Auto-set by energy standard')}
+        ${slider('kfw298Rate','Interest rate', 0.1,2,0.05,'~0.6% for EH40 (as of Mar 2026), ~1.0% for EH55')}
+        <div class="param">
+          <div class="name">Max loan per ${tip('housing unit','unit')}<small>Auto-set by energy standard</small></div>
+          <div class="val" style="font-weight:600">${fmtEur(s.energyStandard === 'EH40-QNG' ? 150000 : 100000)}</div>
+        </div>
         ${slider('kfw298Term','Term', 10,35,1)}
         ${slider('kfw298Grace','Grace period', 1,5,1)}
 
@@ -439,11 +442,11 @@ function getSections() {
         ${slider('constructionMonths','Construction duration', 14,36,1,'Typical MFH: 18–30 months')}`
     },
     { title: 'Operating Costs', tag: 'ASSUMPTIONS', open: false, body: () => `
-        ${slider('maintenancePerM2','Maintenance reserve', 6,20,0.5,'€/m² '+tip('NUF')+' per year')}
-        ${slider('managementPerUnit','Property management', 0,60,5,'€ per '+tip('housing unit','unit')+' per month')}
-        ${slider('insurancePerM2BGF','Building insurance', 1.5,5,0.1,'€/m² '+tip('BGF')+' per year')}
-        ${slider('propertyTaxPerM2','Property tax (Grundsteuer)', 2,10,0.5,'€/m² '+tip('NUF')+' per year')}
-        ${slider('commonUtilitiesPerAdEq','Common area utilities', 8,25,1,'€/adult-equivalent per month')}
+        ${slider('maintenancePerM2','Maintenance reserve', 5,20,0.5,'€/m² '+tip('NUF')+' per year')}
+        ${slider('managementPerUnit','Property management', 0,50,5,'€ per '+tip('housing unit','unit')+' per month')}
+        ${slider('insurancePerM2BGF','Building insurance', 1,8,0.5,'€/m² '+tip('BGF')+' per year')}
+        ${slider('propertyTaxPerM2','Property tax (Grundsteuer)', 2,12,0.5,'€/m² '+tip('NUF')+' per year')}
+        ${slider('commonUtilitiesPerAdEq','Common area utilities', 5,35,1,'€/adult-equivalent per month')}
         ${slider('vacancyBufferPct','Vacancy & default reserve', 0,5,0.5,'Buffer — should be low in a cooperative')}`
     },
   ];
@@ -491,9 +494,22 @@ function toggleSection(i) {
 /** Apply auto-settings based on energy standard selection */
 function applyAutoSettings() {
   const s = state;
-  if (s.energyStandard === 'EH55')        { s.energyPremiumPct = 0; s.kfw298MaxPerUnit = 100000; }
-  else if (s.energyStandard === 'EH40')    { if (s.energyPremiumPct < 5) s.energyPremiumPct = 7; s.kfw298MaxPerUnit = 100000; }
-  else if (s.energyStandard === 'EH40-QNG'){ if (s.energyPremiumPct < 10) s.energyPremiumPct = 12; s.kfw298MaxPerUnit = 150000; }
+  if (s.energyStandard === 'EH55') {
+    s.energyPremiumPct = 0;
+    s.kfw298MaxPerUnit = 100000;
+    if (s.kfw298Rate < 0.8) s.kfw298Rate = 1.0;
+  } else if (s.energyStandard === 'EH40') {
+    if (s.energyPremiumPct < 5) s.energyPremiumPct = 7;
+    s.kfw298MaxPerUnit = 100000;
+    if (s.kfw298Rate > 0.8) s.kfw298Rate = 0.60;
+  } else if (s.energyStandard === 'EH40-QNG') {
+    if (s.energyPremiumPct < 10) s.energyPremiumPct = 12;
+    s.kfw298MaxPerUnit = 150000;
+    if (s.kfw298Rate > 0.8) s.kfw298Rate = 0.60;
+  }
+  // Clamp grace period to allowed max for the selected KfW 134 term bracket
+  const maxGrace = s.kfw134Term >= 26 ? 5 : 3;
+  if (s.kfw134Grace > maxGrace) s.kfw134Grace = maxGrace;
 }
 
 function updateDisplays() {
