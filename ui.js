@@ -255,9 +255,51 @@ function renderSanity(R) {
     ['Equity ratio',       fmt(R.equityRatio,1)+'%', R.equityRatio >= state.bankMinEquityPct],
     ['KfW 134 rate (auto)',R.kfw134RateDisplay.toFixed(2)+'%', true],
   ];
+
+  // --- Annual running cost breakdown (debt service + operating) ---
+  const debtRows = [
+    ['&nbsp;&nbsp;Bank loan repayment',    fmtEurK(R.bankAnnualPayment), true],
+    ['&nbsp;&nbsp;KfW 298 repayment',      fmtEurK(R.kfw298AnnualPayment), true],
+    ['&nbsp;&nbsp;Direktkredite interest', fmtEurK(R.direktkreditAnnualInt), true],
+    ['Total debt service',                 fmtEurK(R.totalCoopAnnualDebt), true],
+  ];
+  const opRows = [
+    ['&nbsp;&nbsp;Maintenance',       fmtEurK(R.maintenance), true],
+    ['&nbsp;&nbsp;Management',        fmtEurK(R.management), true],
+    ['&nbsp;&nbsp;Insurance',         fmtEurK(R.insurance), true],
+    ['&nbsp;&nbsp;Property tax',      fmtEurK(R.propertyTax), true],
+    ['&nbsp;&nbsp;Common utilities',  fmtEurK(R.commonUtilities), true],
+    ['&nbsp;&nbsp;Erbbauzins',        fmtEurK(R.erbbauzinsOperating), true],
+    ['Total operating',               fmtEurK(R.totalOperating), true],
+  ];
+  const totalRows = [
+    ['Debt service + operating',   fmtEurK(R.annualBeforeVacancy), true],
+    ['Vacancy buffer',             fmtEurK(R.vacancyBuffer), true],
+    ['= Total annual cost',        fmtEurK(R.totalAnnualCost), true],
+  ];
+
+  // Rent actually collected across all households should equal totalAnnualCost.
+  // A mismatch means the per-household allocation formula is broken —
+  // either under- or over-charging relative to what the coop needs.
+  const rentDiff = R.totalRentCollected - R.totalAnnualCost;
+  const rentOk = R.totalAnnualCost > 0 ? Math.abs(rentDiff) / R.totalAnnualCost < 0.001 : true;
+  const rentRows = [
+    ['Rent collected (Σ households)', fmtEurK(R.totalRentCollected), rentOk],
+    ['&nbsp;&nbsp;vs. total annual cost', (rentDiff >= 0 ? '+' : '') + fmtEurK(rentDiff), rentOk],
+    ['Avg. rent/m² (all-in)',          fmt(R.avgRentPerM2,2)+' €/m²', true],
+  ];
+
+  const section = (title, rows) =>
+    `<div class="sanity-subhead">${title}</div>` +
+    rows.map(([l,v,ok]) => `${l}: <span class="${ok?'ok':'bad'}">${v}${ok?'':' ⚠'}</span>`).join('<br>');
+
   el.innerHTML = checks.map(([l,v,ok]) =>
     `${l}: <span class="${ok?'ok':'bad'}">${v}${ok?'':' ⚠'}</span>`
-  ).join('<br>');
+  ).join('<br>')
+  + section('Annual debt service', debtRows)
+  + section('Annual operating costs', opRows)
+  + section('Total annual cost', totalRows)
+  + section('Rent allocation check', rentRows);
 }
 
 

@@ -100,14 +100,17 @@ totalAnnual = (debtService + operating) × (1 + vacancyBufferPct)
 
 ## Cost Allocation to Households
 
-Currently uses simple NUF-proportional allocation:
+Currently uses simple NUF-proportional allocation. Each household's fair share of usable space is its own private m² plus an equal per-household split of the shared/common NUF:
 
 ```
-typeShare = (unitsOfType × m²PerUnit) / totalNUF
-monthlyRent = (totalAnnualCost × typeShare) / householdsInType / 12
+m2PerHH           = unitM2 / hhPerUnit
+m2PerHHWithCommon = m2PerHH + (sharedNUF / totalHH)
+monthlyRent        = (totalAnnualCost × m2PerHHWithCommon) / totalNUF / 12
 ```
 
-This means every m² of NUF (private or shared) costs the same per month. A household in a 35m² studio pays for 35m² worth, while a household in a 5-person WG (140m² total) pays for 28m² worth.
+This means every m² of NUF (private or shared) costs the same per month — `monthlyRent / m2PerHHWithCommon` is identical for every household and equal to `avgRentPerM2`. A household in a 35m² studio pays for roughly 35m² + its common-space share, while a household in a 5-person WG (140m² total, i.e. 28m²/household) pays for roughly 28m² + its common-space share.
+
+Note: the numerator must use `m2PerHHWithCommon` (private + common share), not just private m². Using private m² alone in the numerator while dividing by `totalNUF` (private + shared) in the denominator would under-collect rent by exactly `sharedNUF / totalNUF` — nobody would ever be charged for the shared space. The sanity panel's "Rent allocation check" verifies `Σ (monthlyRent × actualHH × 12)` across all households equals `totalAnnualCost`.
 
 **TODO**: The original spec describes a two-part allocation where private-space costs are allocated by m² but shared/common costs are allocated per adult-equivalent. This would make the model fairer (a single person in a studio shouldn't pay the same share of community kitchen costs as a family of four).
 

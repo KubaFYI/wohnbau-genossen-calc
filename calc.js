@@ -342,18 +342,23 @@ function calc() {
   R.units.forEach(u => {
     if (u.actualHH <= 0) { u.result = null; return; }
 
-    // --- Monthly rent ---
-    // Allocated proportionally to the NUF this unit type consumes
-    const typeNUF  = u.unitCount * u.m2;
-    const nufShare = R.totalNUF > 0 ? typeNUF / R.totalNUF : 0;
-    const monthlyRent = (R.totalAnnualCost * nufShare) / u.actualHH / 12;
-
     // --- Coop share (one-off entry cost) ---
     const adultsInHH = s.adultsPerHH;
     const coopShare  = u.sharePrice + (adultsInHH * s.commonSharePerAdult);
     const m2PerHH    = u.m2 / u.hhPerUnit;
-    // For rent-per-m², include each household's proportional share of common space
+    // Each household's fair share of usable space: its own private m² plus
+    // an equal per-household split of the shared/common NUF.
     const m2PerHHWithCommon = m2PerHH + (R.sharedNUF / R.totalHH);
+
+    // --- Monthly rent ---
+    // Allocated proportionally to each household's total space share
+    // (private + common) out of totalNUF, at the flat €/NUF-m² rate implied
+    // by totalAnnualCost. Using m2PerHHWithCommon (not just private m²) here
+    // is what makes rent sum exactly to totalAnnualCost across all
+    // households — see the "Rent collected" sanity check.
+    const monthlyRent = R.totalNUF > 0
+      ? (R.totalAnnualCost * m2PerHHWithCommon) / R.totalNUF / 12
+      : 0;
 
     // --- KfW 134 (personal loan, only for single-unit types) ---
     let kfw134 = null;
@@ -404,6 +409,13 @@ function calc() {
   });
 
   R.avgRentPerM2 = R.totalNUF > 0 ? R.totalAnnualCost / R.totalNUF / 12 : 0;
+
+  // ----- SANITY: total rent actually collected -----
+  // Sum of (monthlyRent × actualHH × 12) across all unit types should equal
+  // totalAnnualCost exactly — if it doesn't, the coop's costs aren't fully
+  // covered by rent (or households are being overcharged).
+  R.totalRentCollected = R.units.reduce(
+    (sum, u) => sum + (u.result ? u.result.monthlyRent * u.actualHH * 12 : 0), 0);
 
   return R;
 }

@@ -344,6 +344,11 @@ header p {
 .debug-panel { font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); line-height: 1.8; }
 .debug-panel .ok { color: var(--green); }
 .debug-panel .bad { color: var(--red); }
+.sanity-subhead {
+  margin-top: 0.7rem; padding-top: 0.4rem; border-top: 1px solid var(--border-light);
+  color: var(--text); font-weight: 600; text-transform: uppercase; font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
 
 @media (max-width: 700px) {
   .param { grid-template-columns: 1fr 120px 65px; gap: 0.4rem; }
