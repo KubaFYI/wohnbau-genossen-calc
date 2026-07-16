@@ -8,6 +8,7 @@ A client-side calculator for estimating monthly costs and financing structure of
 
 Users adjust parameters via sliders and toggles, and instantly see:
 
+- **Build vs. Buy**: estimate the cost of a new-build from a target unit mix, or enter the price/size of an existing building to buy instead (KfW 298, the construction loan, isn't available in Buy mode — KfW 134 still is, since it's a membership loan, not a new-build one)
 - **Total project cost** and how it's financed (member equity, KfW 298, Direktkredite, bank loan)
 - **Monthly rent** per household for each unit type (the household's share of cooperative running costs)
 - **KfW 134 repayment** estimates for individual members (informational — this is a personal loan, not coop-level)

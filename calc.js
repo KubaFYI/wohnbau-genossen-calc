@@ -5,6 +5,11 @@
 // =========================================================
 
 const state = {
+  // --- Acquisition mode ---
+  acquisitionMode: 'build',  // build | buy
+  buyPrice:        2200000,  // € total purchase price of an existing building (incl. land)
+  buySizeNUF:      1100,     // m² NUF (usable floor area) of that existing building
+
   // --- Community size ---
   numHouseholds:     20,
   adultsPerHH:       1.5,
@@ -211,37 +216,68 @@ function calc() {
   R.landArea   = R.footprint / s.gfz;
 
 
+  R.isBuyMode = s.acquisitionMode === 'buy';
+
   // ----- CONSTRUCTION COST -----
+  // Buy mode: the building already exists — nothing to construct.
+  // (This also naturally zeroes architectureCost and interimFinanceCost
+  // below, since both are computed as a function of totalConstruction.)
 
-  R.baseConstruction = R.totalBGF * s.baseCostPerM2BGF;
-  R.energyPremium    = R.baseConstruction * pct(s.energyPremiumPct);
-  R.sharedKitchenCost = s.sharedKitchensEnabled ? s.numSharedKitchens * s.sharedKitchenCost : 0;
-  // Per-unit fit-out: each unit type has its own kitchen/bathroom cost
-  R.perUnitFitout = R.units.reduce((sum, u) => sum + u.unitCount * u.kitchenCost, 0);
-
-  R.constructionSubtotal = R.baseConstruction + R.energyPremium
-                         + R.sharedKitchenCost + R.perUnitFitout;
-  R.contingency          = R.constructionSubtotal * pct(s.contingencyPct);
-  R.totalConstruction    = R.constructionSubtotal + R.contingency;
-
-
-  // ----- LAND COST -----
-
-  R.landValue = s.bodenrichtwert * R.landArea;
-
-  if (s.landModel === 'Kauf') {
-    // Purchase: one-time cost with transfer tax and notary
-    R.landPurchasePrice = R.landValue;
-    R.transferTax       = R.landPurchasePrice * pct(s.transferTaxPct);
-    R.notaryCost        = R.landPurchasePrice * pct(s.notaryPct);
-    R.oneTimeLandCost   = R.landPurchasePrice + R.transferTax + R.notaryCost;
-    R.annualLandCost    = 0;
+  if (R.isBuyMode) {
+    R.baseConstruction  = 0;
+    R.energyPremium     = 0;
+    R.sharedKitchenCost = 0;
+    R.perUnitFitout     = 0;
+    R.constructionSubtotal = 0;
+    R.contingency        = 0;
+    R.totalConstruction  = 0;
   } else {
-    // Erbbaurecht: ongoing annual ground rent, no purchase
-    const effectiveRate  = pct(s.erbbauzinsRatePct) * (1 - pct(s.erbbauzinsDiscount));
-    R.oneTimeLandCost    = 0;
-    R.annualErbbauzins   = R.landValue * effectiveRate;
-    R.annualLandCost     = R.annualErbbauzins;
+    R.baseConstruction = R.totalBGF * s.baseCostPerM2BGF;
+    R.energyPremium    = R.baseConstruction * pct(s.energyPremiumPct);
+    R.sharedKitchenCost = s.sharedKitchensEnabled ? s.numSharedKitchens * s.sharedKitchenCost : 0;
+    // Per-unit fit-out: each unit type has its own kitchen/bathroom cost
+    R.perUnitFitout = R.units.reduce((sum, u) => sum + u.unitCount * u.kitchenCost, 0);
+
+    R.constructionSubtotal = R.baseConstruction + R.energyPremium
+                           + R.sharedKitchenCost + R.perUnitFitout;
+    R.contingency          = R.constructionSubtotal * pct(s.contingencyPct);
+    R.totalConstruction    = R.constructionSubtotal + R.contingency;
+  }
+
+
+  // ----- LAND COST / BUILDING PURCHASE -----
+
+  R.acquisitionCost = 0;
+
+  if (R.isBuyMode) {
+    // Buy mode: buyPrice is a turnkey figure covering building + land.
+    // Grunderwerbsteuer & notary still apply, as with any German
+    // real-estate purchase — land model / Erbbaurecht don't apply since
+    // land isn't acquired separately.
+    R.landValue       = 0;
+    R.oneTimeLandCost  = 0;
+    R.annualLandCost   = 0;
+    R.annualErbbauzins = 0;
+    R.transferTax = s.buyPrice * pct(s.transferTaxPct);
+    R.notaryCost  = s.buyPrice * pct(s.notaryPct);
+    R.acquisitionCost = s.buyPrice + R.transferTax + R.notaryCost;
+  } else {
+    R.landValue = s.bodenrichtwert * R.landArea;
+
+    if (s.landModel === 'Kauf') {
+      // Purchase: one-time cost with transfer tax and notary
+      R.landPurchasePrice = R.landValue;
+      R.transferTax       = R.landPurchasePrice * pct(s.transferTaxPct);
+      R.notaryCost        = R.landPurchasePrice * pct(s.notaryPct);
+      R.oneTimeLandCost   = R.landPurchasePrice + R.transferTax + R.notaryCost;
+      R.annualLandCost    = 0;
+    } else {
+      // Erbbaurecht: ongoing annual ground rent, no purchase
+      const effectiveRate  = pct(s.erbbauzinsRatePct) * (1 - pct(s.erbbauzinsDiscount));
+      R.oneTimeLandCost    = 0;
+      R.annualErbbauzins   = R.landValue * effectiveRate;
+      R.annualLandCost     = R.annualErbbauzins;
+    }
   }
 
 
@@ -255,7 +291,7 @@ function calc() {
   // at the interim rate, for the construction duration
   R.interimFinanceCost = (R.totalConstruction * 0.5) * pct(s.interimRate) * (s.constructionMonths / 12);
 
-  R.totalProjectCost = R.totalConstruction + R.oneTimeLandCost
+  R.totalProjectCost = R.totalConstruction + R.oneTimeLandCost + R.acquisitionCost
                      + R.architectureCost + R.permitsCost + R.legalCost
                      + R.energieberater + R.interimFinanceCost;
 
@@ -274,11 +310,11 @@ function calc() {
   R.commonShares   = R.totalAdults * s.commonSharePerAdult;
   R.memberEquity   = R.unitTypeShares + R.commonShares;
 
-  // KfW 298: subsidized construction loan per housing unit
-  // Max per unit depends on energy standard: €150k with QNG, €100k otherwise
+  // KfW 298: subsidized construction loan per housing unit — new-build only,
+  // not available for purchased/existing buildings
   const kfw298Cap = s.energyStandard === 'EH40-QNG' ? 150000 : 100000;
   R.kfw298Total = 0;
-  if (s.kfw298Enabled && R.totalUnits > 0) {
+  if (s.kfw298Enabled && !R.isBuyMode && R.totalUnits > 0) {
     const costPerUnit = R.totalConstruction / R.totalUnits;
     R.kfw298Total = R.totalUnits * Math.min(kfw298Cap, costPerUnit);
   }
@@ -360,7 +396,9 @@ function calc() {
       ? (R.totalAnnualCost * m2PerHHWithCommon) / R.totalNUF / 12
       : 0;
 
-    // --- KfW 134 (personal loan, only for single-unit types) ---
+    // --- KfW 134 (personal loan, only for single-unit types). Ties to
+    // Genossenschaft membership, not to new construction, so it's still
+    // available in Buy mode — unlike KfW 298. ---
     let kfw134 = null;
     if (u.single) {
       const loanAmount = Math.min(KFW134_MAX_LOAN, coopShare);
@@ -393,7 +431,7 @@ function calc() {
     }
 
     // Upfront cash = coop share minus the loan amount (if KfW 134 applies)
-    const upfrontCash = u.single
+    const upfrontCash = kfw134
       ? Math.max(0, coopShare - KFW134_MAX_LOAN)
       : coopShare;
 
@@ -416,6 +454,17 @@ function calc() {
   // covered by rent (or households are being overcharged).
   R.totalRentCollected = R.units.reduce(
     (sum, u) => sum + (u.result ? u.result.monthlyRent * u.actualHH * 12 : 0), 0);
+
+  // ----- BUY MODE: informational metrics -----
+  // buySizeNUF doesn't feed into any cost calc directly — the unit-mix
+  // config (R.totalNUF) is what actually drives rent/space allocation.
+  // This just flags whether the declared building size and the planned
+  // unit mix roughly agree.
+  if (R.isBuyMode) {
+    R.buyPricePerM2 = s.buySizeNUF > 0 ? s.buyPrice / s.buySizeNUF : 0;
+    R.buySizeMismatchPct = s.buySizeNUF > 0
+      ? (R.totalNUF - s.buySizeNUF) / s.buySizeNUF * 100 : 0;
+  }
 
   return R;
 }

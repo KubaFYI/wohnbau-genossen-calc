@@ -19,6 +19,7 @@ const GLOSSARY = {
   'Grunderwerbsteuer':'Property transfer tax — 6% in Berlin. Only applies when buying land (Kauf), not for Erbbaurecht.',
   'household':        'One membership slot in the cooperative. In WGs, each private room = one household.',
   'housing unit':     'Wohneinheit — one physical dwelling. A WG counts as one unit even though it houses multiple households.',
+  'Buy mode':         "Instead of estimating construction cost from a target unit mix, you enter the purchase price and size of an existing building. KfW 298 (construction loan) is not available, since it requires new-build energy standards — but KfW 134 (personal loan) still applies, since it's tied to Genossenschaft membership, not to new construction.",
 };
 
 /** Wrap a term in a tooltip span */
@@ -223,7 +224,9 @@ function renderFinancingStack(R) {
   ).join('');
 
   document.getElementById('finStack').innerHTML = `
-    <h3>Financing Stack ${infoIcon('How the total project cost is covered. Member equity includes coop shares funded via cash AND personal KfW 134 loans. The bank sees member equity + Direktkredite as the equity base.')}</h3>
+    <h3>Financing Stack ${infoIcon(R.isBuyMode
+      ? 'How the total purchase cost is covered. KfW 298 is unavailable in Buy mode. The bank sees member equity + Direktkredite as the equity base.'
+      : 'How the total project cost is covered. Member equity includes coop shares funded via cash AND personal KfW 134 loans. The bank sees member equity + Direktkredite as the equity base.')}</h3>
     <div class="stack-bar">${bar}</div>
     <div class="stack-legend">${legend}</div>
   `;
@@ -238,6 +241,7 @@ function renderSanity(R) {
   if (!el) return;
   const pctSum = unitTypes.reduce((a,t) => a + t.pctOfHH, 0);
   const checks = [
+    ['Acquisition mode',   R.isBuyMode ? 'Buy' : 'Build', true],
     ['Adults',             fmt(R.totalAdults,1), true],
     ['Children',           fmt(R.totalChildren,1), R.totalChildren < R.totalAdults * 2],
     ['Adult-equivalents',  fmt(R.adultEquivalents,1), true],
@@ -247,7 +251,14 @@ function renderSanity(R) {
     ['Total NUF',          fmt(Math.round(R.totalNUF))+' m²', true],
     ['Total BGF',          fmt(Math.round(R.totalBGF))+' m²', true],
     ['Land needed',        fmt(Math.round(R.landArea))+' m²', true],
-    ['Construction',       fmtEurK(R.totalConstruction), true],
+    ...(R.isBuyMode
+      ? [
+          ['Purchase price',        fmtEurK(state.buyPrice), true],
+          ['Acquisition cost (+tax/notary)', fmtEurK(R.acquisitionCost), true],
+          ['Price/m² (declared size)', fmt(Math.round(R.buyPricePerM2))+' €/m²', true],
+          ['Size match (unit mix vs. declared)', fmt(R.buySizeMismatchPct,1)+'%', Math.abs(R.buySizeMismatchPct) <= 15],
+        ]
+      : [['Construction',       fmtEurK(R.totalConstruction), true]]),
     ['Total project',      fmtEurK(R.totalProjectCost), true],
     ['Cost/m² NUF',        fmt(Math.round(R.totalProjectCost/R.totalNUF))+' €', true],
     ['Cost/unit',          fmtEurK(R.totalProjectCost/R.totalUnits), true],
@@ -308,6 +319,7 @@ function renderSanity(R) {
 // Maps state keys to how their values are formatted for display.
 // =========================================================
 const DISPLAY = {
+  buyPrice: v=>fmtEur(v), buySizeNUF: v=>fmt(v)+' m²',
   numHouseholds: v=>fmt(v), adultsPerHH: v=>fmt(v,1),
   pctWithChildren: v=>fmt(v)+'%', childrenPerHH: v=>fmt(v,1),
   sharedSpacePerAdultEq: v=>fmt(v,1)+' m²', numSharedKitchens: v=>fmt(v),
@@ -394,6 +406,19 @@ function unitTypeCards() {
 function getSections() {
   const s = state;
   return [
+    { title: 'Acquisition Mode', tag: 'WISHES', open: true, body: () => `
+        ${enumButtons('acquisitionMode','Mode',['build','buy'],'Build new vs. '+tip('Buy mode','buy an existing building'))}
+        ${s.acquisitionMode === 'buy' ? `
+          <p style="font-size:0.78rem;color:var(--text-dim);margin:0.5rem 0">
+            Enter the purchase price and size of an existing building. This replaces the construction &amp; land-value estimate below.
+            ${tip('KfW 298')} is a new-build construction loan and is <strong style="color:var(--text)">not available</strong> in Buy mode.
+            ${tip('KfW 134')} ties to Genossenschaft membership rather than new construction, so it still applies.
+          </p>
+          ${slider('buyPrice','Purchase price', 200000,10000000,50000,'Total price for building + land (incl. Grunderwerbsteuer &amp; notary, applied below)')}
+          ${slider('buySizeNUF','Building size', 100,5000,10,'m² '+tip('NUF','NUF (usable floor area)')+' of the existing building')}
+          <div class="derived" id="derivedBuy"></div>
+        ` : ''}`
+    },
     { title: 'Community Size', tag: 'WISHES', open: true, body: () => `
         ${slider('numHouseholds','Number of '+tip('household','households'), 5,40,1,'Primary scaling parameter')}
         ${slider('adultsPerHH','Avg. adults per '+tip('household','household'), 1,3,0.1)}
@@ -418,7 +443,12 @@ function getSections() {
         ${enumButtons('energyStandard','Energy standard',['EH55','EH40','EH40-QNG'],'Affects '+tip('KfW 298')+' eligibility & loan amounts')}
         ${slider('numFloors','Number of floors', 2,6,1,'More floors = less land but higher cost/m²')}`
     },
-    { title: 'Land Acquisition', tag: 'WISHES', open: false, body: () => `
+    { title: 'Land Acquisition', tag: 'WISHES', open: false, body: () => s.acquisitionMode === 'buy' ? `
+        <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:0.5rem">
+          Not applicable in Buy mode — the purchase price already covers land. Transfer tax &amp; notary still apply, to the full purchase price (see Acquisition Mode).
+        </p>
+        ${slider('transferTaxPct',tip('Grunderwerbsteuer'), 6,6,0.5,'Berlin: fixed at 6%')}
+        ${slider('notaryPct','Notary & registration', 1.5,2.5,0.1)}` : `
         ${enumButtons('landModel','Land model',['Kauf','Erbbaurecht'],'Purchase vs. '+tip('Erbbaurecht','leasehold'))}
         ${s.landModel==='Erbbaurecht' ? `
           ${toggle('konzeptverfahren',tip('Konzeptverfahren')+' (Berlin city land)','Land via BIM Berlin concept competition')}
@@ -432,11 +462,17 @@ function getSections() {
           ${slider('erbbauzinsRatePct',tip('Erbbauzins')+' rate', 0.5,4,0.1,'Standard Berlin: 1.8% of land value')}`}`
     },
     { title: 'Financing Choices', tag: 'WISHES', open: false, body: () => `
-        ${toggle('kfw298Enabled','Enable '+tip('KfW 298')+' (construction loan)','Subsidized coop loan — €100k/unit (€150k with '+tip('QNG')+')')}
+        ${s.acquisitionMode === 'buy'
+          ? `<div class="toggle-row"><div class="name">Enable ${tip('KfW 298')} (construction loan)<small>Not available in Buy mode — new-build only</small></div></div>`
+          : toggle('kfw298Enabled','Enable '+tip('KfW 298')+' (construction loan)','Subsidized coop loan — €100k/unit (€150k with '+tip('QNG')+')')}
         ${toggle('direktkreditEnabled','Enable '+tip('Direktkredite'),'Subordinated loans from supporters at below-market rates')}
         ${s.direktkreditEnabled ? slider('direktkreditVolume','Target '+tip('Direktkredite')+' volume', 0,1000000,10000) : ''}`
     },
-    { title: 'Construction Costs', tag: 'ASSUMPTIONS', open: false, body: () => `
+    { title: 'Construction Costs', tag: 'ASSUMPTIONS', open: false, body: () => s.acquisitionMode === 'buy' ? `
+        <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:0.5rem">
+          Not applicable in Buy mode — no new construction. ${tip('BGF')}-to-${tip('NUF')} ratio is still used to estimate insurance &amp; footprint figures.
+        </p>
+        ${slider('bgfToNufRatio',tip('BGF')+'-to-'+tip('NUF')+' ratio', 1.15,1.50,0.01,'Walls, stairs, hallways, elevators')}` : `
         ${slider('baseCostPerM2BGF','Base cost (KG 300+400)', 2000,4200,50,'Berlin 2027 MFH: roughly €2,500–€3,500/m² '+tip('BGF'))}
         ${slider('bgfToNufRatio',tip('BGF')+'-to-'+tip('NUF')+' ratio', 1.15,1.50,0.01,'Walls, stairs, hallways, elevators')}
         ${slider('sharedKitchenCost','Shared kitchen cost (each)', 10000,80000,1000,'Commercial-grade = much higher')}
@@ -458,7 +494,7 @@ function getSections() {
 
         <div class="sub-heading">${tip('KfW 134')} (Personal Member Loan — informational)</div>
         <p style="font-size:0.78rem;color:var(--text-dim);margin:0.3rem 0 0.5rem">
-          Max loan: <strong style="color:var(--text)">€${fmt(KFW134_MAX_LOAN)}</strong> per member · 
+          Max loan: <strong style="color:var(--text)">€${fmt(KFW134_MAX_LOAN)}</strong> per member ·
           Repayment grant: <strong style="color:var(--green)">${Math.round(KFW134_REPAYMENT_GRANT*100)}%</strong> ·
           Rate: <strong style="color:var(--accent)">${kfw134Rate().toFixed(2)}%</strong> (auto-set from term & commitment)
         </p>
@@ -466,6 +502,11 @@ function getSections() {
         ${enumButtons('kfw134Commitment','Rate commitment period',[5,10],'Longer = higher rate',true)}
         ${slider('kfw134Grace','Grace period (repayment-free)', 1, s.kfw134Term >= 26 ? 5 : 3, 1,'Interest-only — monthly payment jumps when this ends')}
 
+        ${s.acquisitionMode === 'buy' ? `
+        <div class="sub-heading">${tip('KfW 298')} (Construction Loan)</div>
+        <p style="font-size:0.78rem;color:var(--text-dim);margin:0.3rem 0 0.5rem">
+          Not available in Buy mode — new-build construction loan only.
+        </p>` : `
         <div class="sub-heading">${tip('KfW 298')} (Construction Loan)</div>
         ${slider('kfw298Rate','Interest rate', 0.1,2,0.05,'~0.6% for EH40 (as of Mar 2026), ~1.0% for EH55')}
         <div class="param">
@@ -473,7 +514,7 @@ function getSections() {
           <div class="val" style="font-weight:600">${fmtEur(s.energyStandard === 'EH40-QNG' ? 150000 : 100000)}</div>
         </div>
         ${slider('kfw298Term','Term', 10,35,1)}
-        ${slider('kfw298Grace','Grace period', 1,5,1)}
+        ${slider('kfw298Grace','Grace period', 1,5,1)}`}
 
         <div class="sub-heading">${tip('Direktkredite')}</div>
         ${slider('direktkreditRate','Avg. interest rate', 0,2,0.1,'Some lenders give 0% as solidarity')}
@@ -582,6 +623,16 @@ function updateOutputs() {
       + ` · ${tip('housing unit','Units')}: <span>${R.totalUnits}</span>`
       + ` · ${tip('household','Households')}: <span>${R.totalHH}</span>`
       + ` · Land: <span>${fmt(Math.round(R.landArea))} m²</span>`;
+  }
+
+  const buyEl = document.getElementById('derivedBuy');
+  if (buyEl && R.isBuyMode) {
+    const mismatchBad = Math.abs(R.buySizeMismatchPct) > 15;
+    buyEl.innerHTML =
+      `Price/m²: <span>${fmt(Math.round(R.buyPricePerM2))} €/m²</span>`
+      + ` · Unit mix needs: <span>${fmt(Math.round(R.totalNUF))} m²</span>`
+      + ` vs. building: <span>${fmt(Math.round(state.buySizeNUF))} m²</span>`
+      + ` <span${mismatchBad?' style="color:var(--red)"':''}>(${R.buySizeMismatchPct>=0?'+':''}${fmt(R.buySizeMismatchPct,1)}%${mismatchBad?' ⚠ adjust unit mix or size':''})</span>`;
   }
 }
 

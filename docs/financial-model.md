@@ -38,6 +38,21 @@ Everything the cooperative as an entity needs to fund and service:
 
 KfW 134 is intentionally excluded from the cooperative's financing stack. From the coop's perspective, it simply receives member equity (shares) regardless of whether members funded them with cash or a personal KfW loan. This avoids double-counting and keeps the coop-level model clean.
 
+## Acquisition Mode: Build vs. Buy
+
+`state.acquisitionMode` (`'build'` | `'buy'`) switches how the total project cost is derived:
+
+- **Build** (default): cost is estimated bottom-up from the unit mix — construction cost per m² BGF, land value from Bodenrichtwert × area, soft costs, etc. (as described below).
+- **Buy**: the user directly enters `buyPrice` (total purchase price, assumed to cover building **and** land) and `buySizeNUF` (the existing building's usable floor area, m²). All construction-cost fields (`baseConstruction`, `energyPremium`, `sharedKitchenCost`, `perUnitFitout`, `contingency` → `totalConstruction`) are zeroed. Transfer tax and notary fees still apply, computed against `buyPrice` instead of a computed land value, giving `R.acquisitionCost = buyPrice × (1 + transferTaxPct + notaryPct)`. This feeds into `totalProjectCost` in place of `totalConstruction + oneTimeLandCost`.
+
+Setting `totalConstruction = 0` in Buy mode has a useful side effect: `architectureCost` (`hoaiPct × totalConstruction`) and `interimFinanceCost` (based on `totalConstruction × 0.5`) both zero out automatically, without special-casing — there's no new-build architecture work or construction-period bridge financing to price in.
+
+`buySizeNUF` is **informational only** — it does not override `R.totalNUF`. The unit-mix configuration (Unit Mix section) still independently determines `R.totalNUF` (and thus rent allocation, insurance, maintenance, property tax, etc.), exactly as in Build mode — it represents how the cooperative plans to divide up and use the building, which may differ slightly from the raw purchased size. `buySizeNUF` is only used to compute `R.buyPricePerM2` and a sanity check (`R.buySizeMismatchPct`) comparing the planned unit mix against the declared building size, flagging (⚠ in the sanity panel) if they diverge by more than 15%.
+
+**Only KfW 298 is disabled in Buy mode** (`R.kfw298Total = 0` regardless of the `kfw298Enabled` toggle) — it's a construction loan tied to new-build energy standards. **KfW 134 remains available in Buy mode**: it's tied to Genossenschaft membership (financing the purchase of Pflichtanteile/coop shares), not to new construction, so single-unit members can still use it to fund their coop share regardless of acquisition mode.
+
+Land model (Kauf vs. Erbbaurecht), Bodenrichtwert, and GFZ are not applicable in Buy mode, since land isn't acquired separately from the building.
+
 ## Space Calculation
 
 ```
